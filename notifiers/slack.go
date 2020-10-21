@@ -48,16 +48,21 @@ func (n *slackNotifier) Send(notification Notification, recipient string) error 
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("notifier", "slack")),
 	}
+
+	params := slack.PostMessageParameters{
+		LinkNames: 1,
+	}
+
 	s := slack.New(n.opts.Token, slack.OptionHTTPClient(client))
 	msgOptions := []slack.MsgOption{slack.MsgOptionText(notification.Body, false)}
 	if n.opts.Username != "" {
-		msgOptions = append(msgOptions, slack.MsgOptionUsername(n.opts.Username))
+		params.Username = n.opts.Username
 	}
 	if n.opts.Icon != "" {
 		if validIconEmoij.MatchString(n.opts.Icon) {
-			msgOptions = append(msgOptions, slack.MsgOptionIconEmoji(n.opts.Icon))
+			params.IconEmoji = n.opts.Icon
 		} else if isValidIconURL(n.opts.Icon) {
-			msgOptions = append(msgOptions, slack.MsgOptionIconURL(n.opts.Icon))
+			params.IconURL = n.opts.Icon
 		} else {
 			log.Warnf("Icon reference '%v' is not a valid emoij or url", n.opts.Icon)
 		}
@@ -77,7 +82,7 @@ func (n *slackNotifier) Send(notification Notification, recipient string) error 
 				return fmt.Errorf("failed to unmarshal blocks '%s' : %v", notification.Slack.Blocks, err)
 			}
 		}
-		msgOptions = append(msgOptions, slack.MsgOptionAttachments(attachments...), slack.MsgOptionBlocks(blocks.BlockSet...))
+		msgOptions = append(msgOptions, slack.MsgOptionPostMessageParameters(params), slack.MsgOptionAttachments(attachments...), slack.MsgOptionBlocks(blocks.BlockSet...))
 	}
 
 	_, _, err := s.PostMessageContext(context.TODO(), recipient, msgOptions...)
